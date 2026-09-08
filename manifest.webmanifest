@@ -1,0 +1,17 @@
+{
+  "name": "Tablero de Mando y Control de la Plana Mayor",
+  "short_name": "Tablero Plana Mayor",
+  "description": "Coordinación en tiempo real de la Plana Mayor del Regimiento: documentación, partes diarios, radiogramas, calendario, sala de coordinación y memorandums.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1c2411",
+  "theme_color": "#2e3b1f",
+  "lang": "es",
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icons/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
