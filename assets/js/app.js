@@ -1,7 +1,7 @@
 /* app.js — Núcleo del Tablero de Mando y Control de la Plana Mayor. */
 import * as db from "./db.js";
 import { h, limpiar, toast, modal, confirmar } from "./ui.js";
-import { sesionActual, pantallaLogin, cerrarSesion, etiquetaRol, esMando } from "./auth.js";
+import { sesionActual, pantallaLogin, pantallaNuevaClave, onCambioSesion, cerrarSesion, etiquetaRol, esMando } from "./auth.js";
 import { panelResumen } from "./resumen.js";
 import { documentacionModulo } from "./modulos/documentacion.js";
 import { partesModulo } from "./modulos/partes.js";
@@ -19,8 +19,8 @@ import { seccionesModulo } from "./modulos/secciones.js";
 
 const MODULOS = [
   { id: "coordinacion", nombre: "Sala de Coordinación", icono: "📡", desc: "Mensajes y disposiciones generales entre toda la Plana Mayor, en vivo.", render: coordinacionModulo },
-  { id: "documentacion", nombre: "Seguimiento de Documentación", icono: "🗂️", desc: "Documentación entrante y saliente por sección. Estado, plazos y proveídos, compartido.", render: documentacionModulo },
-  { id: "partes", nombre: "Partes Diarios", icono: "📋", desc: "Parte de personal de cuadros y de tropa. Visible para toda la Plana Mayor al instante.", render: partesModulo },
+  { id: "documentacion", nombre: "Correspondencia", icono: "📋", desc: "Toda la documentación entrante y saliente de la unidad. Entra aquí para ver tus novedades pendientes.", render: documentacionModulo },
+  { id: "partes", nombre: "Partes (Diario / Semanal / Mensual)", icono: "🗒️", desc: "Partes de cada sección, con su propio formato y periodicidad. Visible para toda la Plana Mayor al instante.", render: partesModulo },
   { id: "radiograma", nombre: "Radiograma y Fotograma", icono: "📨", desc: "Formato oficial de radiograma, mosaico de fotos y envío por WhatsApp.", render: radiogramaModulo },
   { id: "calendario", nombre: "Calendario de Actividades", icono: "📅", desc: "Calendario mensual compartido: actividades y pendientes de la unidad.", render: calendarioModulo },
   { id: "memorandums", nombre: "Memorandums", icono: "🎖️", desc: "Felicitaciones y sanciones, con flujo de emisión y anulación.", render: memorandumsModulo },
@@ -33,20 +33,26 @@ const MODULOS = [
   { id: "secciones", nombre: "Gestionar Secciones", icono: "🧩", desc: "Agrega o edita las secciones del Tablero.", render: seccionesModulo, soloMando: true },
 ];
 
-// Qué herramientas aparecen dentro de cada sección. Si una sección nueva
-// (agregada desde "Gestionar Secciones") no está aquí, usa el valor por
-// defecto: solo Documentación filtrada por su clave.
+// Qué herramientas aparecen dentro de cada sección. "Correspondencia" (antes
+// Documentación) ya NO se repite aquí adentro — es un acceso directo único
+// desde el inicio, para que no haya dudas de dónde encontrarla. Si una
+// sección nueva no está en este mapa, usa el valor por defecto: solo Partes.
 const HERRAMIENTAS_POR_SECCION = {
   comando: ["coordinacion", "partes", "radiograma", "calendario", "secciones"],
-  "P-1": ["efectivos", "vacaciones", "faltas", "memorandums", "documentacion"],
-  "P-2": ["inteligencia", "documentacion"],
-  "P-3": ["partes", "calendario", "documentacion"],
-  "P-4": ["logistica", "documentacion"],
-  "P-5": ["civica", "documentacion"],
-  inspectoria: ["documentacion"],
-  ayudantia: ["radiograma", "documentacion"],
+  "P-1": ["efectivos", "vacaciones", "faltas", "memorandums", "partes"],
+  "P-2": ["inteligencia", "partes"],
+  "P-3": ["partes", "calendario"],
+  "P-4": ["logistica", "partes"],
+  "P-5": ["civica", "partes"],
+  inspectoria: ["partes"],
+  ayudantia: ["radiograma", "partes"],
+  "radio-operador": ["radiograma", "partes"],
+  "sof-cmdo": ["partes"],
+  "comp-a": ["partes"],
+  "comp-b": ["partes"],
+  "comp-c": ["partes"],
 };
-const HERRAMIENTAS_DEFECTO = ["documentacion"];
+const HERRAMIENTAS_DEFECTO = ["partes"];
 
 const vista = document.getElementById("view");
 const btnBack = document.getElementById("btnBack");
@@ -129,7 +135,7 @@ function verSeccion(clave) {
   for (const m of herramientas) {
     grid.appendChild(h("div", {
       class: "modulo-card",
-      onclick: () => verModulo(m.id, m.id === "documentacion" ? { campo: clave } : null),
+      onclick: () => verModulo(m.id, m.id === "partes" ? { campo: clave } : null),
     },
       h("div", { class: "modulo-card__icon" }, m.icono),
       h("h3", { class: "modulo-card__title" }, m.nombre),
@@ -182,6 +188,16 @@ async function renderInicio() {
   if (idInicio !== tokenInicio) return; // el usuario ya cambió de vista
   if (resumen) vista.appendChild(resumen);
 
+  // Acceso único y directo a Correspondencia: todo el que entre a la app debe
+  // encontrarla sin ambigüedad, en vez de tener que adivinar en qué sección vive.
+  vista.appendChild(h("div", { class: "panel", style: "margin-bottom:20px;cursor:pointer", onclick: () => verModulo("documentacion") },
+    h("div", { style: "display:flex;align-items:center;gap:16px" },
+      h("div", { class: "modulo-card__icon", style: "width:60px;height:60px;font-size:30px;flex:0 0 auto" }, "📋"),
+      h("div", {},
+        h("h3", { style: "margin:0 0 4px;font-family:var(--fuente-display);color:var(--oro);font-size:18px;letter-spacing:.5px" }, "📌 Correspondencia — recibida y emitida"),
+        h("p", { class: "muted", style: "margin:0" }, "Entra aquí para ver si tienes alguna novedad pendiente por cumplir. Radio Operador y Ayudantía registran aquí lo que llega.")))));
+
+  vista.appendChild(h("h3", { style: "margin:8px 0 12px;color:var(--texto-suave);font-family:var(--fuente-display);letter-spacing:1px;text-transform:uppercase;font-size:13px;border:none;padding:0" }, "Secciones de la Plana Mayor"));
   const grid = h("div", { class: "grid-modulos" });
   for (const s of secciones) {
     grid.appendChild(h("div", { class: "modulo-card", onclick: () => verSeccion(s.clave) },
@@ -228,11 +244,24 @@ async function arrancar() {
     pantallaLogin(vista, async (s) => { sesion = s; await mostrarApp(); });
   });
 
-  sesion = await sesionActual();
-  if (!sesion) {
-    pantallaLogin(vista, async (s) => { sesion = s; await mostrarApp(); });
-  } else {
-    await mostrarApp();
+  // Si la persona llegó desde el enlace de "recuperar contraseña" que envía
+  // Supabase por correo, esto se dispara antes de mostrar la app normal.
+  let enRecuperacion = false;
+  onCambioSesion((evento) => {
+    if (evento === "PASSWORD_RECOVERY") {
+      enRecuperacion = true;
+      pantallaNuevaClave(vista, async () => { enRecuperacion = false; sesion = await sesionActual(); await mostrarApp(); });
+    }
+  });
+  await new Promise((r) => setTimeout(r, 300)); // da tiempo a que Supabase procese el enlace de recuperación antes de decidir qué pantalla mostrar
+
+  if (!enRecuperacion) {
+    sesion = await sesionActual();
+    if (!sesion) {
+      pantallaLogin(vista, async (s) => { sesion = s; await mostrarApp(); });
+    } else {
+      await mostrarApp();
+    }
   }
 
   if ("serviceWorker" in navigator) {

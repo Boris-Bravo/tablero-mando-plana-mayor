@@ -1,5 +1,5 @@
 /* sw.js — Service Worker: permite abrir la app sin internet (los datos en vivo sí requieren conexión). */
-const CACHE = "tmpm-v3";
+const CACHE = "tmpm-v4";
 const ARCHIVOS = [
   "./",
   "./index.html",
@@ -30,7 +30,7 @@ const ARCHIVOS = [
   "./assets/icons/icon-512.png",
   "./assets/icons/ejercito.png",
   "./assets/icons/eceme.png",
-  "./assets/img/fondo-multicam.jpg",
+  "./assets/img/fondo-desierto.svg",
 ];
 
 self.addEventListener("install", (e) => {

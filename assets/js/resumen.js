@@ -56,36 +56,24 @@ export async function panelResumen(ctx) {
           chip("Por vencer", porvencer, "#ffb02e", () => ctx.verModulo("documentacion")),
           chip("Memorandums en borrador", borradores, "var(--cyan)", () => ctx.verModulo("memorandums")),
           chip("Mensajes últimas 24h", mensajesRecientes, "var(--verde-ok)", () => ctx.verModulo("coordinacion"))));
-    } else if (perfil.rol === "jefe_campo") {
+    } else {
       const [ajustesDoc, documentos] = await Promise.all([
         ctx.db.leerAjustes("documentacion", { diasAlerta: 3 }),
         ctx.db.listar("documentos"),
       ]);
       const diasAlerta = ajustesDoc.diasAlerta || 3;
-      const propios = documentos.filter((d) => d.campo === perfil.campo);
+      const propios = documentos.filter((d) => (d.campos || []).includes(perfil.campo));
       const pendientes = propios.filter((d) => ["pendiente", "tramite"].includes(claveEstado(d, diasAlerta))).length;
       const vencidos = propios.filter((d) => claveEstado(d, diasAlerta) === "vencido").length;
       const porvencer = propios.filter((d) => claveEstado(d, diasAlerta) === "porvencer").length;
 
       panel.append(
-        h("h3", {}, `🗂️ Tu Campo: ${perfil.campo}`),
+        h("h3", {}, `📋 Tu correspondencia: ${perfil.campo}`),
         h("div", { class: "chips" },
           chip("Pendientes", pendientes, "#ffca6e", () => ctx.verModulo("documentacion")),
           chip("Vencidos", vencidos, "var(--rojo-claro)", () => ctx.verModulo("documentacion")),
           chip("Por vencer", porvencer, "#ffb02e", () => ctx.verModulo("documentacion"))),
-        h("div", { class: "btn-row mt" }, h("button", { class: "btn btn--primary btn--sm", onclick: () => ctx.verModulo("documentacion") }, "Ir a tu Documentación")));
-    } else {
-      const mensajes = await ctx.db.listar("tablon_mensajes");
-      const disposicion = mensajes.filter((m) => m.tipo === "disposicion").sort((a, b) => new Date(b.creado) - new Date(a.creado))[0];
-      panel.append(h("h3", {}, "📋 Portal de Personal"));
-      if (disposicion) {
-        panel.append(
-          h("p", { class: "muted small", style: "margin:0 0 6px" }, "Última Disposición General:"),
-          h("p", { style: "margin:0 0 10px" }, h("b", {}, disposicion.titulo || "Disposición General"), " — ", disposicion.contenido));
-      } else {
-        panel.append(h("p", { class: "muted" }, "Sin disposiciones generales por ahora."));
-      }
-      panel.append(h("div", { class: "btn-row" }, h("button", { class: "btn btn--primary btn--sm", onclick: () => ctx.verModulo("coordinacion") }, "Ir a la Sala de Coordinación")));
+        h("div", { class: "btn-row mt" }, h("button", { class: "btn btn--primary btn--sm", onclick: () => ctx.verModulo("documentacion") }, "Ir a Correspondencia")));
     }
   } catch (e) {
     console.error(e);

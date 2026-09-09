@@ -1,6 +1,15 @@
 # Tablero de Mando y Control de la Plana Mayor
 
-App colaborativa: toda la Plana Mayor (Comandante, 2do Comandante, Jefe de Plana Mayor, Jefes P-1…P-5) accede con su propia cuenta y ve los cambios de los demás en tiempo real. A diferencia del "Cuadro de Mando y Control del 2do Comandante" (que es de un solo usuario y vive en tu equipo), esta versión guarda los datos en la nube (Supabase), gratis para un equipo de este tamaño.
+App colaborativa: toda la Plana Mayor accede con su propia cuenta y ve los cambios de los demás en tiempo real. A diferencia del "Cuadro de Mando y Control del 2do Comandante" (que es de un solo usuario y vive en tu equipo), esta versión guarda los datos en la nube (Supabase), gratis para un equipo de este tamaño.
+
+## 👥 Quiénes son parte de la app
+
+Dos roles de mando con control total, y 12 puestos de Plana Mayor (cada uno administra lo suyo y ve todo lo demás):
+
+- **Comandante** y **2do Comandante** (el 2do Comandante funge también como Jefe de Plana Mayor — por eso el rol se muestra como "2do Comandante / Jefe de Plana Mayor") — mando: ven y editan todo, emiten memorandums, y el 2do Comandante administra las cuentas desde Supabase.
+- **P-1 Personal**, **P-2 Inteligencia**, **P-3 Operaciones**, **P-4 Logística**, **P-5 Acción Cívica y Op. Ciudadanas**, **Ayudantía**, **Radio Operador**, **Inspectoría**, **Suboficial de Comando**, **Cmte. Compañía A**, **Cmte. Compañía B**, **Cmte. Compañía C** — cada uno inicia sesión con su propio correo y contraseña.
+
+¿Necesitas agregar otro puesto más adelante (otra compañía, Capellanía, etc.)? Entra a **Comando y Plana Mayor → Gestionar Secciones** y créalo ahí mismo, sin tocar código.
 
 ## 🧩 Estructura: secciones y herramientas
 
@@ -9,15 +18,18 @@ El inicio muestra **secciones** (portales), no una lista plana de módulos. Cada
 | Sección | Herramientas | Quién escribe |
 |---|---|---|
 | 🎖️ Comando y Plana Mayor | Sala de Coordinación, Partes Diarios, Radiograma, Calendario, Gestionar Secciones | Mando (Coordinación: todos publican mensajes; solo mando fija Disposiciones) |
-| 🧑‍🤝‍🧑 P-1 Personal | Registro de Efectivos, Vacaciones y Permisos, Falta a Lista/Bajas Médicas, Memorandums, Documentación | Jefe de Campo P-1 (o mando) |
-| 🔎 P-2 Inteligencia | Reportes de Inteligencia, Documentación | Jefe de Campo P-2 (o mando) |
+| 🧑‍🤝‍🧑 P-1 Personal | Registro de Efectivos, Vacaciones y Permisos, Falta a Lista/Bajas Médicas, Memorandums, Documentación | P-1 (o mando) |
+| 🔎 P-2 Inteligencia | Reportes de Inteligencia, Documentación | P-2 (o mando) |
 | 🗺️ P-3 Operaciones | Partes Diarios, Calendario, Documentación | Mando |
-| 🚚 P-4 Logística | Control Logístico, Documentación | Jefe de Campo P-4 (o mando) |
-| 🤝 P-5 Acción Cívica | Actividades Cívico-Militares, Documentación | Jefe de Campo P-5 (o mando) |
+| 🚚 P-4 Logística | Control Logístico, Documentación | P-4 (o mando) |
+| 🤝 P-5 Acción Cívica | Actividades Cívico-Militares, Documentación | P-5 (o mando) |
 | 🛡️ Inspectoría | Documentación | Mando |
-| 🗂️ Ayudantía y Otros | Radiograma, Documentación | Mando |
+| 🗂️ Ayudantía | Radiograma, Documentación | Mando |
+| 📻 Radio Operador | Radiograma, Documentación | Radio Operador (o mando) |
+| 🎖️ Suboficial de Comando | Documentación | Mando |
+| 🪖 Cmte. Compañía A/B/C | Documentación | Cmte. de esa compañía (o mando) |
 
-*(Mando = Comandante, 2do Comandante o Jefe de Plana Mayor)*
+*(Mando = Comandante o 2do Comandante — son los únicos dos roles con acceso total)*
 
 **¿Quieres agregar una sección nueva** (Capellanía, Comunicaciones, Sanidad, etc.)? Entra a **Comando y Plana Mayor → Gestionar Secciones** (solo visible para el mando) y créala ahí mismo, sin tocar código. Por defecto una sección nueva solo trae el atajo a Documentación; si necesitas una herramienta propia para ella, pídemelo y la agrego.
 
@@ -57,8 +69,8 @@ Por cada persona (incluido tú mismo):
    - `id`: pega el User UID del paso anterior.
    - `nombre`: nombre completo para mostrar en la app.
    - `grado`: grado militar (opcional).
-   - `rol`: uno de `comandante`, `segundo_comandante`, `jefe_plana_mayor`, `jefe_campo`, `staff`.
-   - `campo`: solo si el rol es `jefe_campo` → escribe `P-1`, `P-2`, `P-3`, `P-4` o `P-5`.
+   - `rol`: `comandante`, `segundo_comandante`, o `jefe_campo` (para cualquiera de los 9 puestos de Plana Mayor).
+   - `campo`: solo si el rol es `jefe_campo` → uno de: `P-1`, `P-2`, `P-3`, `P-4`, `P-5`, `ayudantia`, `radio-operador`, `inspectoria`, `sof-cmdo`, `comp-a`, `comp-b`, `comp-c`.
 
 Sin este paso, la persona puede iniciar sesión pero la app le dirá que no tiene un perfil asignado.
 

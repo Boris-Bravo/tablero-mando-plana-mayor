@@ -20,8 +20,8 @@ create table if not exists public.perfiles (
   id uuid primary key references auth.users (id) on delete cascade,
   nombre text not null,
   grado text,
-  rol text not null check (rol in ('comandante', 'segundo_comandante', 'jefe_plana_mayor', 'jefe_campo', 'staff')),
-  campo text, -- solo aplica si rol = 'jefe_campo' (ej. 'P-1', 'P-2'...)
+  rol text not null check (rol in ('comandante', 'segundo_comandante', 'jefe_campo')),
+  campo text, -- solo aplica si rol = 'jefe_campo': 'P-1'…'P-5', 'ayudantia', 'radio-operador', 'inspectoria' o 'sof-cmdo'
   creado timestamptz not null default now()
 );
 alter table public.perfiles enable row level security;
@@ -35,8 +35,16 @@ language sql stable as $$ select rol from public.perfiles where id = auth.uid() 
 create or replace function public.campo_actual() returns text
 language sql stable as $$ select campo from public.perfiles where id = auth.uid() $$;
 
+-- "Mando" = Comandante y 2do Comandante, MÁS Radio Operador y Ayudantía: los
+-- 4 puestos con acceso irrestricto a toda la app (el resto de jefe_campo solo
+-- administra su propio campo y ve el resto en modo lectura). Al vivir aquí
+-- (una sola función usada por todas las políticas de escritura de la base),
+-- este cambio aplica automáticamente a todas las tablas sin tocarlas una por una.
 create or replace function public.es_mando() returns boolean
-language sql stable as $$ select public.rol_actual() in ('comandante', 'segundo_comandante', 'jefe_plana_mayor') $$;
+language sql stable as $$
+  select public.rol_actual() in ('comandante', 'segundo_comandante')
+    or public.campo_actual() in ('radio-operador', 'ayudantia')
+$$;
 
 -- ---------------------------------------------------------------------------
 -- AJUSTES: configuración compartida por módulo (una fila por módulo), en vez
@@ -101,12 +109,15 @@ create policy "documentos_delete" on public.documentos for delete to authenticat
   using (public.es_mando() or (public.rol_actual() = 'jefe_campo' and campo = public.campo_actual()));
 
 -- ---------------------------------------------------------------------------
--- PARTES: Partes Diarios (Cuadros / Tropa). Escritura reservada al mando en
--- esta primera fase; toda la Plana Mayor los ve en tiempo real.
+-- PARTES: Cuadros / Tropa (unidad completa, solo mando) o el formato propio
+-- de cada sección (P-1…P-5 y demás puestos), con periodicidad diario/semanal/
+-- mensual. Toda la Plana Mayor los ve en tiempo real.
 -- ---------------------------------------------------------------------------
 create table if not exists public.partes (
   id uuid primary key default gen_random_uuid(),
-  tipo text not null check (tipo in ('cuadros', 'tropa')),
+  tipo text not null check (tipo in ('cuadros', 'tropa', 'personalizado')),
+  campo text, -- null/omitido = parte de toda la unidad (Cuadros/Tropa); si no, la clave de la sección dueña
+  periodicidad text not null default 'diario' check (periodicidad in ('diario', 'semanal', 'mensual')),
   fecha date not null,
   unidad text,
   comandante text,
@@ -123,12 +134,16 @@ create table if not exists public.partes (
 alter table public.partes enable row level security;
 drop policy if exists "partes_select" on public.partes;
 create policy "partes_select" on public.partes for select to authenticated using (true);
+-- La política de escritura definitiva (que usa la columna "campo") se crea
+-- más abajo, en "PARTES v2" — así funciona igual si la tabla es nueva o si
+-- ya existía de una instalación anterior (donde "campo" todavía no existe
+-- en este punto del script).
 drop policy if exists "partes_write" on public.partes;
 create policy "partes_write" on public.partes for all to authenticated using (public.es_mando()) with check (public.es_mando());
 
 -- ---------------------------------------------------------------------------
--- RADIOGRAMAS: historial de radiogramas guardados. Escritura reservada al
--- mando; toda la Plana Mayor los ve.
+-- RADIOGRAMAS: historial de radiogramas guardados. Escritura del mando y del
+-- Radio Operador (es su herramienta de trabajo); toda la Plana Mayor los ve.
 -- ---------------------------------------------------------------------------
 create table if not exists public.radiogramas (
   id uuid primary key default gen_random_uuid(),
@@ -143,7 +158,9 @@ alter table public.radiogramas enable row level security;
 drop policy if exists "radiogramas_select" on public.radiogramas;
 create policy "radiogramas_select" on public.radiogramas for select to authenticated using (true);
 drop policy if exists "radiogramas_write" on public.radiogramas;
-create policy "radiogramas_write" on public.radiogramas for all to authenticated using (public.es_mando()) with check (public.es_mando());
+create policy "radiogramas_write" on public.radiogramas for all to authenticated
+  using (public.es_mando() or (public.rol_actual() = 'jefe_campo' and public.campo_actual() = 'radio-operador'))
+  with check (public.es_mando() or (public.rol_actual() = 'jefe_campo' and public.campo_actual() = 'radio-operador'));
 
 -- ---------------------------------------------------------------------------
 -- CALENDARIO_ITEMS: agenda compartida. Escritura reservada al mando.
@@ -456,6 +473,104 @@ drop policy if exists "confirmaciones_select" on public.tablon_confirmaciones;
 create policy "confirmaciones_select" on public.tablon_confirmaciones for select to authenticated using (true);
 drop policy if exists "confirmaciones_insert" on public.tablon_confirmaciones;
 create policy "confirmaciones_insert" on public.tablon_confirmaciones for insert to authenticated with check (perfil_id = auth.uid());
+
+-- ---------------------------------------------------------------------------
+-- ROLES DEFINITIVOS DE LA PLANA MAYOR: Comandante, 2do Comandante, y 9
+-- puestos con rol 'jefe_campo' (P-1…P-5, Ayudantía, Radio Operador,
+-- Inspectoría, Suboficial de Comando). Se quita "Jefe de Plana Mayor" y
+-- "Personal" del vocabulario de roles — no existían cuentas con esos roles,
+-- así que este cambio no afecta a nadie ya creado.
+-- ---------------------------------------------------------------------------
+alter table public.perfiles drop constraint if exists perfiles_rol_check;
+alter table public.perfiles add constraint perfiles_rol_check check (rol in ('comandante', 'segundo_comandante', 'jefe_campo'));
+
+insert into public.secciones (clave, nombre, icono, descripcion, orden) values
+  ('radio-operador', 'Radio Operador', '📻', 'Radiogramas y comunicaciones de la unidad.', 8),
+  ('sof-cmdo', 'Suboficial de Comando', '🎖️', 'Apoyo administrativo directo al mando.', 9),
+  ('comp-a', 'Cmte. Compañía A', '🪖', 'Documentación y novedades de la Compañía A.', 10),
+  ('comp-b', 'Cmte. Compañía B', '🪖', 'Documentación y novedades de la Compañía B.', 11),
+  ('comp-c', 'Cmte. Compañía C', '🪖', 'Documentación y novedades de la Compañía C.', 12)
+on conflict (clave) do nothing;
+
+update public.ajustes set valor = valor || '{"campos":["P-1","P-2","P-3","P-4","P-5","ayudantia","radio-operador","inspectoria","sof-cmdo","comp-a","comp-b","comp-c"]}'::jsonb
+  where clave = 'documentacion';
+
+-- ---------------------------------------------------------------------------
+-- DOCUMENTOS v2: acorta la burocracia real del regimiento.
+--  - Varios destinatarios por documento (antes solo uno).
+--  - Adjunto (foto/PDF/Word) para adelantar el contenido antes de que llegue
+--    el físico.
+--  - tipo_documento: qué clase de documento es (radiograma, informe, plan,
+--    relación nominal, otro).
+--  - etapa: en qué punto de la cadena de firmas está (Recibido → Proveído
+--    del Comandante → Proveído del 2do Cmte → Entregado), con quién y cuándo
+--    dio cada proveído — así el conocimiento llega al instante aunque el
+--    papel físico siga su trámite.
+-- ---------------------------------------------------------------------------
+alter table public.documentos add column if not exists campos text[] not null default '{}';
+update public.documentos set campos = array[campo] where campo is not null and campos = '{}';
+alter table public.documentos alter column campo drop not null;
+
+alter table public.documentos add column if not exists adjunto_url text;
+alter table public.documentos add column if not exists tipo_documento text check (tipo_documento in ('radiograma', 'informe', 'plan', 'relacion_nominal', 'otro'));
+alter table public.documentos add column if not exists etapa text not null default 'recibido' check (etapa in ('recibido', 'con_proveido_cmte', 'con_proveido_2do_cmte', 'entregado'));
+alter table public.documentos add column if not exists proveido_comandante text;
+alter table public.documentos add column if not exists proveido_comandante_por uuid references public.perfiles (id);
+alter table public.documentos add column if not exists proveido_comandante_en timestamptz;
+alter table public.documentos add column if not exists proveido_2do_cmte text;
+alter table public.documentos add column if not exists proveido_2do_cmte_por uuid references public.perfiles (id);
+alter table public.documentos add column if not exists proveido_2do_cmte_en timestamptz;
+
+-- Comprobante de envío (foto/screenshot de lo enviado) + confirmación de que
+-- Ayudantía o Radio Operador efectivamente lo transmitieron (segundo visto
+-- bueno, distinto de quien elaboró/respondió el documento).
+alter table public.documentos add column if not exists adjunto_envio_url text;
+alter table public.documentos add column if not exists confirmado_envio_por uuid references public.perfiles (id);
+alter table public.documentos add column if not exists confirmado_envio_en timestamptz;
+
+-- Radio Operador y Ayudantía son los puntos de entrada reales de correspondencia:
+-- pueden registrar/editar un documento para CUALQUIER destinatario. El resto de
+-- jefe_campo solo si aparece entre los destinatarios (campos) del documento.
+drop policy if exists "documentos_insert" on public.documentos;
+create policy "documentos_insert" on public.documentos for insert to authenticated
+  with check (
+    public.es_mando()
+    or public.campo_actual() in ('radio-operador', 'ayudantia')
+    or (public.rol_actual() = 'jefe_campo' and public.campo_actual() = any (campos))
+  );
+drop policy if exists "documentos_update" on public.documentos;
+create policy "documentos_update" on public.documentos for update to authenticated
+  using (
+    public.es_mando()
+    or public.campo_actual() in ('radio-operador', 'ayudantia')
+    or (public.rol_actual() = 'jefe_campo' and public.campo_actual() = any (campos))
+  )
+  with check (
+    public.es_mando()
+    or public.campo_actual() in ('radio-operador', 'ayudantia')
+    or (public.rol_actual() = 'jefe_campo' and public.campo_actual() = any (campos))
+  );
+drop policy if exists "documentos_delete" on public.documentos;
+create policy "documentos_delete" on public.documentos for delete to authenticated
+  using (
+    public.es_mando()
+    or public.campo_actual() in ('radio-operador', 'ayudantia')
+    or (public.rol_actual() = 'jefe_campo' and public.campo_actual() = any (campos))
+  );
+
+-- ---------------------------------------------------------------------------
+-- PARTES v2: cada sección puede tener su propio parte (además de los Cuadros/
+-- Tropa de toda la unidad), con periodicidad diario/semanal/mensual.
+-- ---------------------------------------------------------------------------
+alter table public.partes add column if not exists campo text;
+alter table public.partes add column if not exists periodicidad text not null default 'diario' check (periodicidad in ('diario', 'semanal', 'mensual'));
+alter table public.partes drop constraint if exists partes_tipo_check;
+alter table public.partes add constraint partes_tipo_check check (tipo in ('cuadros', 'tropa', 'personalizado'));
+
+drop policy if exists "partes_write" on public.partes;
+create policy "partes_write" on public.partes for all to authenticated
+  using (public.es_mando() or (public.rol_actual() = 'jefe_campo' and campo is not null and public.campo_actual() = campo))
+  with check (public.es_mando() or (public.rol_actual() = 'jefe_campo' and campo is not null and public.campo_actual() = campo));
 
 -- ---------------------------------------------------------------------------
 -- Tiempo real: agrega las tablas a la publicación de Supabase Realtime para
