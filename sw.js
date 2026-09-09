@@ -1,5 +1,5 @@
 /* sw.js — Service Worker: permite abrir la app sin internet (los datos en vivo sí requieren conexión). */
-const CACHE = "tmpm-v5";
+const CACHE = "tmpm-v6";
 const ARCHIVOS = [
   "./",
   "./index.html",

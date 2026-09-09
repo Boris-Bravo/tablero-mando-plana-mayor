@@ -299,7 +299,7 @@ body::after {
 .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
 /* ===== Tablas ===== */
-.tabla-wrap { overflow-x: auto; border: 1px solid var(--linea); border-radius: var(--radio-sm); background: rgba(0,0,0,.2); }
+.tabla-wrap { overflow-x: auto; border: 1px solid var(--linea); border-radius: var(--radio-sm); background: var(--panel-solid); }
 table.data { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 520px; }
 table.data th, table.data td { padding: 10px 12px; border-bottom: 1px solid var(--linea); text-align: left; color: var(--texto); }
 table.data thead th {
