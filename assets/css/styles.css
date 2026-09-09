@@ -56,18 +56,18 @@ body {
   color: var(--texto);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
-  /* Fondo tipo "camo desierto" sobrio en tonos beige — pegado al documento
-     (no "fixed") para que no se repinte en cada scroll. */
+  /* Fondo: camuflaje digital desierto real (tela tipo MultiCam Arid), atenuado
+     con una capa clara encima para que el texto siga siendo legible — pegado
+     al documento (no "fixed") para que no se repinte en cada scroll. */
   background-color: var(--bg-0);
   background-image:
-    radial-gradient(900px 500px at 12% -8%, rgba(63,110,99,.08), transparent 60%),
-    radial-gradient(1000px 600px at 108% 10%, rgba(116,121,63,.10), transparent 55%),
-    radial-gradient(800px 700px at 50% 120%, rgba(169,117,44,.08), transparent 60%),
-    linear-gradient(160deg, rgba(255,252,244,.62), rgba(230,217,184,.62) 60%),
-    url("../img/fondo-desierto.svg");
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat;
-  background-size: auto, auto, auto, auto, 420px 420px;
-  background-position: 0 0, 0 0, 0 0, 0 0, top left;
+    radial-gradient(900px 500px at 12% -8%, rgba(63,110,99,.06), transparent 60%),
+    radial-gradient(1000px 600px at 108% 10%, rgba(116,121,63,.08), transparent 55%),
+    linear-gradient(160deg, rgba(255,252,244,.72), rgba(240,229,203,.72) 60%),
+    url("../img/fondo-multicam.jpg");
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+  background-size: auto, auto, auto, 340px 340px;
+  background-position: 0 0, 0 0, 0 0, top left;
 }
 body::after {
   content: "";
